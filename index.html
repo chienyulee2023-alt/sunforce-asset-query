@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>晟福資產查詢系統</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <img src="logo.jpg" alt="SunForce 晟福科技" class="logo" />
+      <div>
+        <p class="eyebrow">SunForce Technology</p>
+        <h1>晟福資產查詢系統</h1>
+        <p class="sub">可用產品標號或品名查詢，快速確認庫存／資產、實盤數量與存放位置。</p>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="search-panel">
+      <div class="search-box">
+        <span class="icon">🔎</span>
+        <input id="keyword" type="search" placeholder="輸入產品標號或品名，例如：ADAM、漏水、H009..." autocomplete="off" />
+        <button id="clearBtn" type="button">清除</button>
+      </div>
+      <div class="tips">輸入關鍵字後會即時列出相關資料；查到有實盤數量時，可填寫借用／領用單據並列印。</div>
+      <div class="file-tools">
+        <label class="file-label">更新 Excel 資料
+          <input id="excelFile" type="file" accept=".xlsx,.xls" />
+        </label>
+        <span id="dataSource">目前資料來源：內建資料</span>
+      </div>
+    </section>
+
+    <section class="stats" aria-label="統計資訊">
+      <div class="stat-card"><b id="totalCount">0</b><span>資料筆數</span></div>
+      <div class="stat-card"><b id="resultCount">0</b><span>查詢結果</span></div>
+      <div class="stat-card"><b id="availableCount">0</b><span>有實盤數量</span></div>
+    </section>
+
+    <section class="result-head">
+      <h2>查詢結果</h2>
+      <span id="queryText">請先輸入關鍵字</span>
+    </section>
+    <section id="results" class="grid"></section>
+  </main>
+
+  <div id="modal" class="modal" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-title">
+        <h2>晟福科技 借用/領用單據</h2>
+        <button id="closeModal" type="button" aria-label="關閉">×</button>
+      </div>
+      <form id="borrowForm">
+        <div class="form-grid">
+          <label>單號<input id="borrowNo" readonly /></label>
+          <label>工號<input id="empNo" required /></label>
+          <label>姓名<input id="empName" required /></label>
+          <label>借用物料號碼<input id="borrowCode" readonly /></label>
+          <label>借用物料名稱<input id="borrowName" readonly /></label>
+          <label>借用數量<input id="borrowQty" type="number" min="1" step="1" required /></label>
+          <label>借用日期<input id="borrowDate" type="date" required /></label>
+          <label>歸還狀態<select id="returnType" required><option value="歸回">歸回</option><option value="不歸還">不歸還</option></select></label>
+          <label>存放位置<input id="borrowLocation" readonly /></label>
+          <label>物料類別<input id="borrowMaterial" readonly /></label>
+        </div>
+        <label class="full">用途／備註<textarea id="borrowNote" rows="3" placeholder="可填寫用途、專案或其他備註"></textarea></label>
+        <div class="actions">
+          <button type="button" id="exportRecordsBtn" class="secondary">匯出借用紀錄</button>
+          <button type="button" id="printBtn" class="primary">列印單據</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
