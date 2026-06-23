@@ -63,18 +63,20 @@
           <label>借用數量<input id="borrowQty" type="number" min="1" step="1" required /></label>
           <label>借用日期<input id="borrowDate" type="date" required /></label>
           <label>歸還狀態<select id="returnType" required><option value="歸回">歸回</option><option value="不歸還">不歸還</option></select></label>
+          <label>用途類型<select id="purposeType" required><option value="專案施工">專案施工</option><option value="設備維修">設備維修</option><option value="客戶展示">客戶展示</option><option value="客戶測試">客戶測試</option><option value="研發測試">研發測試</option><option value="備品借用">備品借用</option><option value="其他">其他</option></select></label>
           <label>存放位置<input id="borrowLocation" readonly /></label>
           <label>物料類別<input id="borrowMaterial" readonly /></label>
         </div>
-        <label class="full">用途／備註<textarea id="borrowNote" rows="3" placeholder="可填寫用途、專案或其他備註"></textarea></label>
+        <label class="full">用途說明／備註<textarea id="borrowNote" rows="3" placeholder="可填寫專案名稱、客戶名稱、維修原因或其他備註"></textarea></label>
         <div class="actions">
-          <button type="button" id="exportRecordsBtn" class="secondary">匯出借用紀錄</button>
+          <button type="button" id="exportRecordsBtn" class="secondary">匯出單據檔</button>
+          <button type="button" id="exportBtn" class="secondary">匯出本筆單據</button>
           <button type="button" id="printBtn" class="primary">列印單據</button>
         </div>
       </form>
     </div>
   </div>
-  <script src="data.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
