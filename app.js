@@ -198,7 +198,7 @@ function pick(row, names){
 function normalizeRow(row){
   const code = pick(row, ['產品標號','產品編號','產品料號','料號','標號','品號','資產編號','Code','code']);
   const name = pick(row, ['品名','產品名稱','名稱','品名規格','規格','Name','name']);
-  const qty = pick(row, ['實盤','現有數量','庫存數量','數量','實際數量','盤點數量','Qty','qty']);
+  const qty = pick(row, ['現有數量','現有','實盤','庫存數量','數量','實際數量','盤點數量','Qty','qty']);
   const location = pick(row, ['存放位置','位置','存放的地方','庫位','Location','location']);
   let material = pick(row, ['物料欄位','物料類別','物料','類別','分類','庫存或資產','庫存/資產','Material','material']);
   if(!material) material = String(code).trim() ? '庫存' : '';
@@ -216,14 +216,66 @@ function normalizeRow(row){
 
 
 function worksheetToObjects(workbook){
-  const sheetName = workbook.SheetNames[0];
-  const worksheet = workbook.Sheets[sheetName];
-  return XLSX.utils.sheet_to_json(worksheet, {defval: '', raw: false});
+  if(workbook.SheetNames.length < 2){
+    throw new Error('請保留 Excel 的前兩個工作表：第一張庫存、第二張資產。');
+  }
+
+  // Read the original workbook directly; the third and later sheets are ignored.
+  const rows = [];
+  const cleanHeader = value => String(value ?? '').replace(/\s+/g, '');
+  const codeHeaders = ['產品標號','產品編號','產品料號','料號','標號','品號','資產編號'];
+  const nameHeaders = ['品名','產品名稱','名稱','品名規格','規格'];
+  const quantityHeaders = ['現有數量','現有'];
+  const locationHeaders = ['存放位置','位置','存放的地方','庫位'];
+
+  workbook.SheetNames.slice(0, 2).forEach((sheetName, sheetIndex) => {
+    const table = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {
+      header: 1, defval: '', raw: false
+    });
+    const headerIndex = table.findIndex(row => {
+      const headers = row.map(cleanHeader);
+      return codeHeaders.some(name => headers.includes(name)) &&
+        nameHeaders.some(name => headers.includes(name)) &&
+        quantityHeaders.some(name => headers.includes(name));
+    });
+    if(headerIndex < 0){
+      throw new Error(`工作表「${sheetName}」找不到產品編號、品名及現有數量／現有欄位。`);
+    }
+
+    const headers = table[headerIndex].map(cleanHeader);
+    const column = names => {
+      for(const name of names){
+        const index = headers.indexOf(name);
+        if(index >= 0) return index;
+      }
+      return -1;
+    };
+    const codeColumn = column(codeHeaders);
+    const nameColumn = column(nameHeaders);
+    const quantityColumn = column(quantityHeaders);
+    const locationColumn = column(locationHeaders);
+
+    table.slice(headerIndex + 1).forEach(row => {
+      const qty = num(row[quantityColumn]);
+      const code = String(row[codeColumn] ?? '').trim();
+      const name = String(row[nameColumn] ?? '').trim();
+      // Never fall back to physical-count quantities when current quantity is blank/zero.
+      if(qty <= 0 || (!code && !name)) return;
+      rows.push({
+        '物料': sheetIndex === 0 ? '庫存' : '資產',
+        '產品編號': code,
+        '品名': name,
+        '現有數量': qty,
+        '存放位置': locationColumn < 0 ? '' : String(row[locationColumn] ?? '').trim()
+      });
+    });
+  });
+  return rows;
 }
 
 function applyRows(rows, sourceLabel){
   const box = $('results');
-  data = (rows || []).map(normalizeRow).filter(x => x.code || x.name);
+  data = (rows || []).map(normalizeRow).filter(x => (x.code || x.name) && num(x.qty) > 0);
 
   $('totalCount').textContent = data.length.toLocaleString('zh-TW');
   $('resultCount').textContent = '0';
@@ -234,7 +286,7 @@ function applyRows(rows, sourceLabel){
 
   if(!data.length){
     box.innerHTML = `<div class="empty">data.xlsx 已讀取，但沒有可顯示資料。<br><br>
-    請確認 Excel 第一列有欄位名稱，例如：物料、產品編號、品名、實盤、存放位置。</div>`;
+    前兩個工作表中，沒有「現有數量／現有」大於 0 的庫存或資產。</div>`;
     return;
   }
 
@@ -266,7 +318,7 @@ async function loadExcel(){
       applyRows(fallback, '目前資料來源：備援內建資料');
     }else{
       box.innerHTML = `<div class="empty">無法讀取 data.xlsx。<br><br>
-      請確認 data.xlsx 與 index.html 放在同一層，並用 Netlify / 網頁伺服器開啟，不要直接用檔案方式開啟 index.html。</div>`;
+      請確認 data.xlsx 與 index.html 放在同一層，並用 Netlify / 網頁伺服器開啟，不要直接用檔案方式開啟 index.html。<br><br>${escapeHtml(err.message || '')}</div>`;
     }
   }
 }
@@ -287,7 +339,7 @@ function handleLocalExcelFile(file){
       render();
     }catch(err){
       console.error(err);
-      alert('Excel 讀取失敗，請確認檔案格式是 .xlsx。');
+      alert('Excel 讀取失敗，請確認檔案格式是 .xlsx。\n' + (err.message || ''));
     }
   };
   reader.readAsArrayBuffer(file);
