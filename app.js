@@ -216,57 +216,43 @@ function normalizeRow(row){
 
 
 function worksheetToObjects(workbook){
-  if(workbook.SheetNames.length < 2){
-    throw new Error('請保留 Excel 的前兩個工作表：第一張庫存、第二張資產。');
+  const sourceSheets = ['庫存', '資產'];
+  const missing = sourceSheets.filter(name => !workbook.SheetNames.includes(name));
+  if(missing.length){
+    throw new Error(`data.xlsx 缺少工作表：${missing.join('、')}。`);
   }
 
-  // Read the original workbook directly; the third and later sheets are ignored.
+  // The stock header is above its records, while the asset header is below its records.
+  // Read the two named sheets by their stable columns so both layouts work unchanged.
   const rows = [];
   const cleanHeader = value => String(value ?? '').replace(/\s+/g, '');
-  const codeHeaders = ['產品標號','產品編號','產品料號','料號','標號','品號','資產編號'];
-  const nameHeaders = ['品名','產品名稱','名稱','品名規格','規格'];
-  const quantityHeaders = ['現有數量','現有'];
-  const locationHeaders = ['存放位置','位置','存放的地方','庫位'];
-
-  workbook.SheetNames.slice(0, 2).forEach((sheetName, sheetIndex) => {
+  sourceSheets.forEach(sheetName => {
     const table = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {
-      header: 1, defval: '', raw: false
+      header: 1, defval: '', raw: true
     });
-    const headerIndex = table.findIndex(row => {
-      const headers = row.map(cleanHeader);
-      return codeHeaders.some(name => headers.includes(name)) &&
-        nameHeaders.some(name => headers.includes(name)) &&
-        quantityHeaders.some(name => headers.includes(name));
-    });
-    if(headerIndex < 0){
-      throw new Error(`工作表「${sheetName}」找不到產品編號、品名及現有數量／現有欄位。`);
+    const columns = sheetName === '庫存'
+      ? { code: 0, name: 1, qty: 6, location: 7 }
+      : { code: 1, name: 2, qty: 6, location: 7 };
+    const hasExpectedHeader = table.some(row =>
+      cleanHeader(row[columns.code]) === '產品編號' &&
+      cleanHeader(row[columns.name]) === '品名' &&
+      ['現有數量', '現有'].includes(cleanHeader(row[columns.qty]))
+    );
+    if(!hasExpectedHeader){
+      throw new Error(`工作表「${sheetName}」的產品編號、品名或現有數量欄位位置已變更，請檢查 Excel 格式。`);
     }
 
-    const headers = table[headerIndex].map(cleanHeader);
-    const column = names => {
-      for(const name of names){
-        const index = headers.indexOf(name);
-        if(index >= 0) return index;
-      }
-      return -1;
-    };
-    const codeColumn = column(codeHeaders);
-    const nameColumn = column(nameHeaders);
-    const quantityColumn = column(quantityHeaders);
-    const locationColumn = column(locationHeaders);
-
-    table.slice(headerIndex + 1).forEach(row => {
-      const qty = num(row[quantityColumn]);
-      const code = String(row[codeColumn] ?? '').trim();
-      const name = String(row[nameColumn] ?? '').trim();
-      // Never fall back to physical-count quantities when current quantity is blank/zero.
+    table.forEach(row => {
+      const qty = num(row[columns.qty]);
+      const code = String(row[columns.code] ?? '').trim();
+      const name = String(row[columns.name] ?? '').trim();
       if(qty <= 0 || (!code && !name)) return;
       rows.push({
-        '物料': sheetIndex === 0 ? '庫存' : '資產',
+        '物料': sheetName,
         '產品編號': code,
         '品名': name,
         '現有數量': qty,
-        '存放位置': locationColumn < 0 ? '' : String(row[locationColumn] ?? '').trim()
+        '存放位置': String(row[columns.location] ?? '').trim()
       });
     });
   });
@@ -286,7 +272,7 @@ function applyRows(rows, sourceLabel){
 
   if(!data.length){
     box.innerHTML = `<div class="empty">data.xlsx 已讀取，但沒有可顯示資料。<br><br>
-    前兩個工作表中，沒有「現有數量／現有」大於 0 的庫存或資產。</div>`;
+    「庫存」與「資產」工作表中，沒有現有數量大於 0 的資料。</div>`;
     return;
   }
 
@@ -393,10 +379,10 @@ function render(){
         <div class="code">${escapeHtml(item.code)}</div>
         <div class="name">${escapeHtml(item.name)}</div>
         <div class="info">
-          <div><span>現有數量｜實盤</span><b>${fmt(item.qty)}</b></div>
+          <div><span>現有數量</span><b>${fmt(item.qty)}</b></div>
           <div><span>存放位置</span><b>${escapeHtml(item.location || '未填寫')}</b></div>
         </div>
-        <button class="borrow" ${available ? '' : 'disabled'} onclick="openBorrow(${idx})">${available ? '📝 填寫單據列印' : '無實盤數量'}</button>
+        <button class="borrow" ${available ? '' : 'disabled'} onclick="openBorrow(${idx})">${available ? '📝 填寫單據列印' : '無現有數量'}</button>
       </div>
     </article>`;
   }).join('');
@@ -466,7 +452,7 @@ function validateBorrowForm(){
   const item = window.selectedItem || {};
   const qty = Number($('borrowQty').value);
   if(qty > num(item.qty)){
-    alert('借用數量不可大於實盤數量');
+    alert('借用數量不可大於現有數量');
     return false;
   }
   return true;
